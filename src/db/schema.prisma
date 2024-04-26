@@ -1,0 +1,73 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
+  username     String?
+  password     String
+  salt         String?
+  sessionToken String?
+  theme        String    @default("dafault")
+  favorites    Favorite[]
+}
+
+model Nanny {
+  id             Int       @id @default(autoincrement())
+  name           String
+  avatar         String?
+  birthday       DateTime
+  experiense     Int
+  education      String
+  kids_age       String
+  price_per_hour Int
+  location       String
+  about          String
+  characters     String[]
+  rating         Float  @default(0)
+  favorites   Favorite[] 
+  reviews        Review[]
+  meeting Meeting[]
+}
+
+model Favorite{
+  id  Int @id @default(autoincrement())
+  user_id Int
+  nanny_id  Int
+  user  User  @relation(fields: [user_id], references: [id])
+  nanny Nanny @relation(fields: [nanny_id], references: [id])
+}
+
+model Review {
+  id        Int     @id @default(autoincrement())
+  nanny_id  Int
+  nanny  Nanny @relation(fields: [nanny_id], references: [id])
+  reviewer  String
+  rating    Float
+  comment   String
+}
+
+model Meeting {
+  id  Int @id @default(autoincrement())
+  nanny Nanny @relation(fields: [nanny_id], references: [id])
+  nanny_id  Int
+  address String
+  phone String
+  email String
+  date  DateTime
+  child_age String
+  parrent_name  String
+  comment String
+}
