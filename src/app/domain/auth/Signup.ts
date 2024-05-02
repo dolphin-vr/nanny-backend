@@ -1,10 +1,12 @@
 import "reflect-metadata";
 import { JsonController, Post, Body } from "routing-controllers";
 import { PrismaClient } from "@prisma/client";
-import { ISignup } from "./Auth.types";
+import { ISignup } from "../../../types/Auth.types";
 import { ApiResponse } from "helpers/ApiResponse";
 import { ApiError } from "helpers/ApiError";
 import { hashPassword, random } from "helpers";
+import { SignupDto } from "dto/Signup.dto";
+import { validate } from "class-validator";
 
 const prisma = new PrismaClient();
 const { JWT_SECRET, TOKEN_TTL, APP_URL } = process.env;
@@ -12,7 +14,15 @@ const { JWT_SECRET, TOKEN_TTL, APP_URL } = process.env;
 @JsonController("/auth/signup")
 export default class Signup {
   @Post()
-  async createUser(@Body() body: ISignup) {
+  async createUser(@Body() body: SignupDto) {
+    const errors = await validate(body);
+    if (errors.length > 0) {
+      throw new ApiError(400, {
+        message: "Validation failed",
+        code: "SIGNUP_VALIDATION_ERROR",
+        errors,
+      })
+    }
     try {
       const { username, email, password } = body;
       const user = await prisma.user.findFirst({ where: { email } });

@@ -13,19 +13,30 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  USER
+  NANNY
+  MANAGER
+  ADMIN
+}
+
 model User {
-  id           Int       @id @default(autoincrement())
-  email        String    @unique
+  id           Int        @id @default(autoincrement())
+  email        String     @unique
   username     String?
   password     String
   salt         String?
   sessionToken String?
-  theme        String    @default("dafault")
+  accessToken  String?
+  avatar       String?
+  role         Role       @default(USER)
+  verified     Boolean    @default(false)
+  theme        String     @default("dafault")
   favorites    Favorite[]
 }
 
 model Nanny {
-  id             Int       @id @default(autoincrement())
+  id             Int        @id @default(autoincrement())
   name           String
   avatar         String?
   birthday       DateTime
@@ -36,38 +47,38 @@ model Nanny {
   location       String
   about          String
   characters     String[]
-  rating         Float  @default(0)
-  favorites   Favorite[] 
+  rating         Float      @default(0)
+  favorites      Favorite[]
   reviews        Review[]
-  meeting Meeting[]
+  meeting        Meeting[]
 }
 
-model Favorite{
-  id  Int @id @default(autoincrement())
-  user_id Int
-  nanny_id  Int
-  user  User  @relation(fields: [user_id], references: [id])
-  nanny Nanny @relation(fields: [nanny_id], references: [id])
+model Favorite {
+  id       Int   @id @default(autoincrement())
+  user_id  Int
+  nanny_id Int
+  user     User  @relation(fields: [user_id], references: [id])
+  nanny    Nanny @relation(fields: [nanny_id], references: [id])
 }
 
 model Review {
-  id        Int     @id @default(autoincrement())
-  nanny_id  Int
-  nanny  Nanny @relation(fields: [nanny_id], references: [id])
-  reviewer  String
-  rating    Float
-  comment   String
+  id       Int    @id @default(autoincrement())
+  nanny_id Int
+  nanny    Nanny  @relation(fields: [nanny_id], references: [id])
+  reviewer String
+  rating   Float
+  comment  String
 }
 
 model Meeting {
-  id  Int @id @default(autoincrement())
-  nanny Nanny @relation(fields: [nanny_id], references: [id])
-  nanny_id  Int
-  address String
-  phone String
-  email String
-  date  DateTime
-  child_age String
-  parrent_name  String
-  comment String
+  id           Int      @id @default(autoincrement())
+  nanny        Nanny    @relation(fields: [nanny_id], references: [id])
+  nanny_id     Int
+  address      String
+  phone        String
+  email        String
+  date         DateTime
+  child_age    String
+  parrent_name String
+  comment      String
 }
