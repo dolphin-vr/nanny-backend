@@ -31,7 +31,7 @@ model User {
   avatar       String?
   role         Role       @default(USER)
   verified     Boolean    @default(false)
-  theme        String     @default("dafault")
+  theme        String     @default("default")
   favorites    Favorite[]
 }
 
