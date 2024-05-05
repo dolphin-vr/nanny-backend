@@ -1,7 +1,7 @@
-import Signup from "./auth/Signup";
-import UsersDelete from "./users/Delete";
+import AuthController from "./controllers/AuthController";
+import UsersController from "./controllers/UsersController";
 // type Controller = typeof Signup;
 // const controllers = <Controller[]>[Signup, UsersDelete];
-const controllers = [Signup, UsersDelete];
+const controllers = [AuthController, UsersController];
 
 export { controllers };
