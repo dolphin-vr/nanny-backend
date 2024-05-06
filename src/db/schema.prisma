@@ -25,7 +25,7 @@ model User {
   email        String     @unique
   username     String?
   password     String
-  salt         String?
+  salt         String
   sessionToken String?
   accessToken  String?
   avatar       String?
