@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { JsonController, Post, Body, Param } from "routing-controllers";
+import { JsonController, Post, Body, Param, UseBefore, Req } from "routing-controllers";
 import { PrismaClient } from "@prisma/client";
 import { ApiResponse } from "helpers/ApiResponse";
 import { ApiError } from "helpers/ApiError";
@@ -9,8 +9,9 @@ import { validate } from "class-validator";
 import jwt from "jsonwebtoken";
 import sendEmail from "helpers/sendEmail";
 import { jwtDecode } from "jwt-decode";
-import { IJwtPayload } from "types/payload";
+import { IJwtPayload, IRequest } from "types/extended";
 import { SigninDto } from "dto/Signin.dto";
+import { Authentication } from "app/middlewares/Authentication";
 
 const prisma = new PrismaClient();
 const { VERIFICATION_TOKEN_TTL, SESSION_TOKEN_TTL, ACCESS_TOKEN_TTL, APP_URL } = process.env;
@@ -46,7 +47,6 @@ export default class AuthController {
         html: `<p>Thank you for registering!</p><p><a href="${APP_URL}/verify/${verificationToken}" target="_blank">Click to verify your email</a></p>`,
       };
       const send = await sendEmail(verificationEmail);
-      // console.log("send= ", send)
       return new ApiResponse(true, { email: newUser.email });
     } catch (error) {
       console.log(error);
@@ -57,14 +57,11 @@ export default class AuthController {
   @Post("/verify/:token")
   async verify(@Param("token") token: string) {
     const { email } = jwtDecode(token) as IJwtPayload;
-    // console.log('email=', email)
     const user = await prisma.user.findFirst({ where: { email } });
-    // console.log('user= ', user)
     if (!user) {
       return new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" });
     }
     const upd = await prisma.user.update({ where: { email }, data: { verified: true, sessionToken: "" } });
-    // console.log('upd= ', upd)
     return new ApiResponse(true, "Verification successful");
   }
 
@@ -102,5 +99,14 @@ export default class AuthController {
       console.log(error);
       return new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
     }
+  }
+
+  // refresh ???
+
+  @Post("/signout")
+  @UseBefore(Authentication)
+  async signout(@Req() req: IRequest) {
+    await prisma.user.update({ where: { id: req.user.id }, data: { sessionToken: "", accessToken: "" } });
+    return new ApiResponse(true, "Signout successful");
   }
 }
