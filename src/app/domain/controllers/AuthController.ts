@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { JsonController, Post, Body, Param, UseBefore, Req } from "routing-controllers";
+import { JsonController, Post, Body, Param, UseBefore, Req, Patch } from "routing-controllers";
 import { PrismaClient } from "@prisma/client";
 import { ApiResponse } from "helpers/ApiResponse";
 import { ApiError } from "helpers/ApiError";
@@ -12,6 +12,8 @@ import { jwtDecode } from "jwt-decode";
 import { IJwtPayload, IRequest } from "types/extended";
 import { SigninDto } from "dto/Signin.dto";
 import { Authentication } from "app/middlewares/Authentication";
+import { PasswdRemindDto } from "dto/PasswdRemind.dto";
+import { PasswdResetDto } from "dto/PasswdReset.dto";
 
 const prisma = new PrismaClient();
 const { VERIFICATION_TOKEN_TTL, SESSION_TOKEN_TTL, ACCESS_TOKEN_TTL, APP_URL } = process.env;
@@ -43,10 +45,10 @@ export default class AuthController {
 
       const verificationEmail = {
         to: email,
-        subject: "Verification email",
+        subject: "NannyService verification email",
         html: `<p>Thank you for registering!</p><p><a href="${APP_URL}/verify/${verificationToken}" target="_blank">Click to verify your email</a></p>`,
       };
-      const send = await sendEmail(verificationEmail);
+      await sendEmail(verificationEmail);
       return new ApiResponse(true, { email: newUser.email });
     } catch (error) {
       console.log(error);
@@ -57,7 +59,7 @@ export default class AuthController {
   @Post("/verify/:token")
   async verify(@Param("token") token: string) {
     const { email } = jwtDecode(token) as IJwtPayload;
-    const user = await prisma.user.findFirst({ where: { email } });
+    const user = await prisma.user.findFirst({ where: { email, sessionToken: token } });
     if (!user) {
       return new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" });
     }
@@ -108,5 +110,69 @@ export default class AuthController {
   async signout(@Req() req: IRequest) {
     await prisma.user.update({ where: { id: req.user.id }, data: { sessionToken: "", accessToken: "" } });
     return new ApiResponse(true, "Signout successful");
+  }
+
+  /**
+   *
+   * @param body = {"email": "valid email"}
+   * @returns
+   */
+  @Post("/remind")
+  async remind(@Body() body: PasswdRemindDto) {
+    const errors = await validate(body);
+    if (errors.length > 0) {
+      throw new ApiError(400, {
+        message: "Validation failed",
+        code: "REMIND_VALIDATION_ERROR",
+        errors,
+      });
+    }
+
+    try {
+      const { email } = body;
+      const user = await prisma.user.findFirst({ where: { email } });
+      if (!user) {
+        return new ApiError(401, { code: "INVALID_EMAIL", message: "Invalid e-mail" });
+      }
+      const payload = { email: user.email };
+      const verificationToken = jwt.sign(payload, JWT_SECRET, { expiresIn: VERIFICATION_TOKEN_TTL });
+      await prisma.user.update({ where: { id: user.id }, data: { sessionToken: verificationToken } });
+      const resetpasswdEmail = {
+        to: email,
+        subject: "NannyService Password reset",
+        html: `<p><a href="${APP_URL}/reset/${verificationToken}" target="_blank">Click to reset your password</a></p>`,
+      };
+      await sendEmail(resetpasswdEmail);
+      return new ApiResponse(true, { email });
+    } catch (error) {
+      console.log(error);
+      return new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+    }
+  }
+
+  @Patch("/reset")
+  async reset(@Body() body: PasswdResetDto) {
+    const errors = await validate(body);
+    if (errors.length > 0) {
+      throw new ApiError(400, {
+        message: "Validation failed",
+        code: "RESET_VALIDATION_ERROR",
+        errors,
+      });
+    }
+
+    try {
+      const { password, token } = body;
+      const { email } = jwtDecode(token) as IJwtPayload;
+      const user = await prisma.user.findFirst({ where: { email, sessionToken: token } });
+      if (!user) {
+        return new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" });
+      }
+      await prisma.user.update({ where: { id: user.id }, data: { password: hashPassword(user.salt, password), sessionToken: "" } });
+      return new ApiResponse(true, "Password was changed successfuly");
+    } catch (error) {
+      console.log(error);
+      return new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+    }
   }
 }
