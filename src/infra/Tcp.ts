@@ -7,6 +7,9 @@ import { IService } from "types/services";
 import { controllers } from "app/domain";
 import { middlewares } from "app/middlewares";
 
+
+const PORT = process.env.PORT;
+
 export class Tcp implements IService {
   private static instance: Tcp;
 
@@ -35,8 +38,8 @@ export class Tcp implements IService {
     });
 
     return new Promise<boolean>(resolve => {
-      server.listen(4000, () => {
-        console.log("Tcp service started on port 4000");
+      server.listen(PORT, () => {
+        console.log(`Tcp service started on port ${PORT}`);
 
         return resolve(true);
       });
