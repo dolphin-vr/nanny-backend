@@ -18,9 +18,16 @@ import { PasswdResetDto } from "dto/PasswdReset.dto";
 const prisma = new PrismaClient();
 const { VERIFICATION_TOKEN_TTL, SESSION_TOKEN_TTL, ACCESS_TOKEN_TTL, APP_URL } = process.env;
 const JWT_SECRET: string = process.env.JWT_SECRET as string;
+const ACCESS_SECRET: string = process.env.ACCESS_SECRET as string;
 
 @JsonController("/auth")
 export default class AuthController {
+
+  /**
+   *
+   * @param body = { username: string, email: valid email, password: string (min 7, max 48) }
+   * @returns
+   */
   @Post("/signup")
   async signup(@Body() body: SignupDto) {
     const errors = await validate(body);
@@ -67,6 +74,11 @@ export default class AuthController {
     return new ApiResponse(true, "Verification successful");
   }
 
+  /**
+   *
+   * @param body = { email: valid email, password: string (min 7, max 48) }
+   * @returns
+   */
   @Post("/signin")
   async signin(@Body() body: SigninDto) {
     const errors = await validate(body);
@@ -93,7 +105,7 @@ export default class AuthController {
       }
 
       const sessionToken = jwt.sign({ id: user.id, email }, JWT_SECRET, { expiresIn: SESSION_TOKEN_TTL });
-      const accessToken = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
+      const accessToken = jwt.sign({ id: user.id, role: user.role }, ACCESS_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
       await prisma.user.update({ where: { id: user.id }, data: { email, sessionToken, accessToken } });
 
       return new ApiResponse(true, { email, sessionToken, accessToken });
@@ -150,6 +162,11 @@ export default class AuthController {
     }
   }
 
+  /**
+   *
+   * @param body  = { password: string (min 7, max 48), token: JWT }
+   * @returns
+   */
   @Patch("/reset")
   async reset(@Body() body: PasswdResetDto) {
     const errors = await validate(body);

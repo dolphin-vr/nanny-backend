@@ -6,9 +6,9 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "devm": "nodemon",
-    "deva": "ts-node-dev --respawn --transpile-only src/index.ts",
-    "dev": "ts-node-dev --respawn --transpile-only src/main.ts"
+    "dev": "nodemon",
+    "start": "node -r tsconfig-paths/register ./dist/main.js",
+    "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@prisma/client": "^5.13.0",

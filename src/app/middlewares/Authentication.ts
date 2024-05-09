@@ -6,7 +6,7 @@ import { ExpressMiddlewareInterface } from "routing-controllers";
 import { IJwtPayload, IRequest } from "types/extended";
 
 const prisma = new PrismaClient();
-const JWT_SECRET: string = process.env.JWT_SECRET as string;
+const ACCESS_SECRET: string = process.env.ACCESS_SECRET as string;
 
 export class Authentication implements ExpressMiddlewareInterface {
   async use(req: IRequest, res: Response, next: NextFunction) {
@@ -19,7 +19,7 @@ export class Authentication implements ExpressMiddlewareInterface {
       return new ApiError(401, { code: "AUTH_TYPE_MISMATCH", message: "Authorization type mismatch" });
     }
     try {
-      const { id, role } = jwt.verify(token, JWT_SECRET) as IJwtPayload;
+      const { id, role } = jwt.verify(token, ACCESS_SECRET) as IJwtPayload;
       const user = await prisma.user.findFirst({ where: { id, role } });
       if (!user || !user.accessToken || user.accessToken !== token) {
         return new ApiError(401, { code: "USER_NOT_AUTHORIZED", message: "User not authorized" });
