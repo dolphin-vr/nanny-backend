@@ -7,7 +7,7 @@
   "private": true,
   "scripts": {
     "dev": "nodemon",
-    "start": "node -r tsconfig-paths/register ./dist/main.js",
+    "start": "node -r tsconfig-paths/register ./src/dist/main.js",
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
