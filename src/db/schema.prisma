@@ -21,18 +21,24 @@ enum Role {
 }
 
 model User {
-  id           Int        @id @default(autoincrement())
-  email        String     @unique
-  username     String?
-  password     String
-  salt         String
-  sessionToken String?
-  accessToken  String?
-  avatar       String?
-  role         Role       @default(USER)
-  verified     Boolean    @default(false)
-  theme        String     @default("default")
-  favorites    Favorite[]
+  id        Int        @id @default(autoincrement())
+  email     String     @unique
+  username  String?
+  password  String
+  salt      String
+  avatar    String?
+  role      Role       @default(USER)
+  verified  Boolean    @default(false)
+  theme     String     @default("default")
+  favorites Favorite[]
+  sessions  Session[]
+}
+
+model Session {
+  id           Int    @id @default(autoincrement())
+  user_id      Int
+  user         User   @relation(fields: [user_id], references: [id])
+  sessionToken String @unique
 }
 
 model Nanny {
