@@ -6,7 +6,7 @@ import "dotenv/config";
 import { IService } from "types/services";
 import { controllers } from "app/domain";
 import { middlewares } from "app/middlewares";
-
+import cookieParser from "cookie-parser";
 
 const PORT = process.env.PORT;
 
@@ -27,6 +27,7 @@ export class Tcp implements IService {
     const { server, routePrefix } = this;
 
     server.use(express.json());
+    server.use(cookieParser());
 
     useExpressServer(server, {
       routePrefix,

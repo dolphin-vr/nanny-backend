@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { JsonController, Post, Body, Param, UseBefore, Req, Patch } from "routing-controllers";
+import { JsonController, Post, Body, Param, UseBefore, Req, Patch, CookieParam, Res } from "routing-controllers";
 import { PrismaClient } from "@prisma/client";
 import { ApiResponse } from "helpers/ApiResponse";
 import { ApiError } from "helpers/ApiError";
@@ -14,15 +14,22 @@ import { SigninDto } from "dto/Signin.dto";
 import { Authentication } from "app/middlewares/Authentication";
 import { PasswdRemindDto } from "dto/PasswdRemind.dto";
 import { PasswdResetDto } from "dto/PasswdReset.dto";
+import { Response } from "express";
 
 const prisma = new PrismaClient();
 const { VERIFICATION_TOKEN_TTL, SESSION_TOKEN_TTL, ACCESS_TOKEN_TTL, APP_URL } = process.env;
-const JWT_SECRET: string = process.env.JWT_SECRET as string;
+const SESSION_SECRET: string = process.env.SESSION_SECRET as string;
 const ACCESS_SECRET: string = process.env.ACCESS_SECRET as string;
+
+// session cookie maxAge. default 1d = 86400000ms
+const SESSION_MAX_AGE: number = SESSION_TOKEN_TTL?.includes("d")
+  ? parseInt(SESSION_TOKEN_TTL) * 24 * 60 * 60 * 1000
+  : SESSION_TOKEN_TTL?.includes("h")
+  ? parseInt(SESSION_TOKEN_TTL) * 60 * 60 * 1000
+  : 86400000;
 
 @JsonController("/auth")
 export default class AuthController {
-
   /**
    *
    * @param body = { username: string, email: valid email, password: string (min 7, max 48) }
@@ -46,9 +53,10 @@ export default class AuthController {
         return new ApiError(409, { code: "INVALID_EMAIL", message: "Invalid e-mail" });
       }
 
-      const verificationToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: VERIFICATION_TOKEN_TTL });
+      const verificationToken = jwt.sign({ email }, SESSION_SECRET, { expiresIn: VERIFICATION_TOKEN_TTL });
       const salt = random();
-      const newUser = await prisma.user.create({ data: { username, email, password: hashPassword(salt, password), salt, sessionToken: verificationToken } });
+      const newUser = await prisma.user.create({ data: { username, email, password: hashPassword(salt, password), salt } });
+      await prisma.session.create({ data: { user_id: newUser.id, sessionToken: verificationToken } });
 
       const verificationEmail = {
         to: email,
@@ -65,12 +73,19 @@ export default class AuthController {
 
   @Post("/verify/:token")
   async verify(@Param("token") token: string) {
-    const { email } = jwtDecode(token) as IJwtPayload;
-    const user = await prisma.user.findFirst({ where: { email, sessionToken: token } });
+    // TRY-CATCH ???
+    const { email } = jwt.verify(token, SESSION_SECRET) as IJwtPayload;
+    // const { email } = jwtDecode(token) as IJwtPayload;
+    const user = await prisma.user.findFirst({ where: { email } });
     if (!user) {
       return new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" });
     }
-    const upd = await prisma.user.update({ where: { email }, data: { verified: true, sessionToken: "" } });
+    const verificationToken = await prisma.session.findFirst({ where: { user_id: user.id, sessionToken: token } });
+    if (!verificationToken) {
+      return new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" }); // ?? error code and message ?? sth about token?
+    }
+    await prisma.user.update({ where: { email }, data: { verified: true } });
+    await prisma.session.delete({ where: { id: verificationToken.id } });
     return new ApiResponse(true, "Verification successful");
   }
 
@@ -80,7 +95,7 @@ export default class AuthController {
    * @returns
    */
   @Post("/signin")
-  async signin(@Body() body: SigninDto) {
+  async signin(@Body() body: SigninDto, @Res() res: Response) {
     const errors = await validate(body);
     if (errors.length > 0) {
       throw new ApiError(400, {
@@ -104,11 +119,19 @@ export default class AuthController {
         return new ApiError(401, { code: "INVALID_EMAIL_OR_PASSWORD", message: "E-mail or password invalid" });
       }
 
-      const sessionToken = jwt.sign({ id: user.id, email }, JWT_SECRET, { expiresIn: SESSION_TOKEN_TTL });
+      const sessionToken = jwt.sign({ id: user.id, email }, SESSION_SECRET, { expiresIn: SESSION_TOKEN_TTL });
       const accessToken = jwt.sign({ id: user.id, role: user.role }, ACCESS_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
-      await prisma.user.update({ where: { id: user.id }, data: { email, sessionToken, accessToken } });
 
-      return new ApiResponse(true, { email, sessionToken, accessToken });
+      await prisma.session.create({ data: { user_id: user.id, sessionToken } });
+
+      // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      //
+      //                                                       PUT sessionToken IN COOKIE!!!!
+      //
+      // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      res.cookie("sid", sessionToken, { httpOnly: true, sameSite: "none", secure: true, maxAge: SESSION_MAX_AGE });
+
+      return new ApiResponse(true, { email, accessToken });
     } catch (error) {
       console.log(error);
       return new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
@@ -118,9 +141,20 @@ export default class AuthController {
   // refresh ???
 
   @Post("/signout")
-  @UseBefore(Authentication)
-  async signout(@Req() req: IRequest) {
-    await prisma.user.update({ where: { id: req.user.id }, data: { sessionToken: "", accessToken: "" } });
+  async signout(@CookieParam("sid") token: string, @Res() res: Response) {
+    console.log("sid= ", token);
+    if (!token) return new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+
+    const { id } = jwt.verify(token, SESSION_SECRET) as IJwtPayload;
+    const session = await prisma.session.findFirst({ where: { user_id: id, sessionToken: token } });
+    // or just
+    // const session = await prisma.session.findFirst({ where: { sessionToken: token } });
+
+    if (session) await prisma.session.delete({ where: { sessionToken: token } }); // user_id ?
+
+    //  CLEAR COOKIE!!!
+    res.clearCookie("sid", { httpOnly: true, sameSite: "none", secure: true });
+
     return new ApiResponse(true, "Signout successful");
   }
 
@@ -147,8 +181,8 @@ export default class AuthController {
         return new ApiError(401, { code: "INVALID_EMAIL", message: "Invalid e-mail" });
       }
       const payload = { email: user.email };
-      const verificationToken = jwt.sign(payload, JWT_SECRET, { expiresIn: VERIFICATION_TOKEN_TTL });
-      await prisma.user.update({ where: { id: user.id }, data: { sessionToken: verificationToken } });
+      const verificationToken = jwt.sign(payload, SESSION_SECRET, { expiresIn: VERIFICATION_TOKEN_TTL });
+      // await prisma.user.update({ where: { id: user.id }, data: { sessionToken: verificationToken } });
       const resetpasswdEmail = {
         to: email,
         subject: "NannyService Password reset",
@@ -181,11 +215,11 @@ export default class AuthController {
     try {
       const { password, token } = body;
       const { email } = jwtDecode(token) as IJwtPayload;
-      const user = await prisma.user.findFirst({ where: { email, sessionToken: token } });
-      if (!user) {
-        return new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" });
-      }
-      await prisma.user.update({ where: { id: user.id }, data: { password: hashPassword(user.salt, password), sessionToken: "" } });
+      // const user = await prisma.user.findFirst({ where: { email, sessionToken: token } });
+      // if (!user) {
+      //   return new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" });
+      // }
+      // await prisma.user.update({ where: { id: user.id }, data: { password: hashPassword(user.salt, password), sessionToken: "" } });
       return new ApiResponse(true, "Password was changed successfuly");
     } catch (error) {
       console.log(error);

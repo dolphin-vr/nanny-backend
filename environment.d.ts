@@ -3,7 +3,7 @@
 //     interface ProcessEnv {
 //       [key: string]: string;
 //       DATABASE_URL: string;
-//       JWT_SECRET: string;
+//       SESSION_SECRET: string;
 //       VERIFICATION_TOKEN_TTL: string;
 //       APP_URL: string;
 //       MAIL_HOST: string;
