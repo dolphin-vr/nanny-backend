@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import { ApiError } from "helpers/ApiError";
+import { ApiError } from "../../helpers/ApiError";
 import { ExpressMiddlewareInterface } from "routing-controllers";
 import { IJwtPayload, IRequest } from "types/extended";
 
