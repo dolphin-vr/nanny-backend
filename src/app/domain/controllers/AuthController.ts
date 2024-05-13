@@ -74,7 +74,6 @@ export default class AuthController {
   async verify(@Param("token") token: string) {
     // TRY-CATCH ???
     const { email } = jwt.verify(token, SESSION_SECRET) as IJwtPayload;
-    // const { email } = jwtDecode(token) as IJwtPayload;
     const user = await prisma.user.findFirst({ where: { email } });
     if (!user) {
       return new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" });
@@ -181,7 +180,7 @@ export default class AuthController {
       }
       const payload = { email: user.email };
       const verificationToken = jwt.sign(payload, SESSION_SECRET, { expiresIn: VERIFICATION_TOKEN_TTL });
-      // await prisma.user.update({ where: { id: user.id }, data: { sessionToken: verificationToken } });
+      await prisma.session.create({ data: { user_id: user.id, sessionToken: verificationToken } });
       const resetpasswdEmail = {
         to: email,
         subject: "NannyService Password reset",
@@ -213,12 +212,13 @@ export default class AuthController {
 
     try {
       const { password, token } = body;
-      const { email } = jwtDecode(token) as IJwtPayload;
-      // const user = await prisma.user.findFirst({ where: { email, sessionToken: token } });
-      // if (!user) {
-      //   return new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" });
-      // }
-      // await prisma.user.update({ where: { id: user.id }, data: { password: hashPassword(user.salt, password), sessionToken: "" } });
+      const { email } = jwt.verify(token, SESSION_SECRET) as IJwtPayload;
+      const user = await prisma.user.findFirst({ where: { email } });
+      if (!user) {
+        return new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" });
+      }
+      await prisma.user.update({ where: { id: user.id }, data: { password: hashPassword(user.salt, password) } });
+      await prisma.session.deleteMany({ where: { user_id: user.id } }); // delete all active sessions
       return new ApiResponse(true, "Password was changed successfuly");
     } catch (error) {
       console.log(error);
