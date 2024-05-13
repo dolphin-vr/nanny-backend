@@ -20,10 +20,8 @@ const nodemailerConfig: Options = {
 };
 const transport = nodemailer.createTransport(nodemailerConfig);
 
-const sendEmail = (data: IEmail) => {
+export const sendEmail = (data: IEmail) => {
   // console.log("opt-mail= ", nodemailerConfig);
   const email = { ...data, from: MAIL_FROM };
   return transport.sendMail(email);
 };
-
-export default sendEmail;
