@@ -1,6 +1,5 @@
 import { PrismaClient } from "@prisma/client";
-import { ApiError } from "../../../helpers/ApiError";
-import { ApiResponse } from "../../../helpers/ApiResponse";
+import { ApiError, ApiResponse } from "../../../helpers";
 import { Controller, Delete } from "routing-controllers";
 
 const prisma = new PrismaClient();

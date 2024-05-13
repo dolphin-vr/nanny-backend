@@ -1,19 +1,15 @@
 import "reflect-metadata";
-import { JsonController, Post, Body, Param, UseBefore, Req, Patch, CookieParam, Res } from "routing-controllers";
+import { JsonController, Post, Body, Param, UseBefore, Req, Patch, CookieParam, Res, Get } from "routing-controllers";
 import { validate } from "class-validator";
-import { Response } from "express";
+import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
-import jwt from "jsonwebtoken";
-import { ApiResponse } from "../../../helpers/ApiResponse";
-import { ApiError } from "../../../helpers/ApiError";
-import { hashPassword, random } from "../../../helpers";
-import sendEmail from "../../../helpers/sendEmail";
-import { jwtDecode } from "jwt-decode";
+import jwt, { VerifyErrors } from "jsonwebtoken";
 import { IJwtPayload, IRequest } from "types/extended";
 import { SignupDto } from "../../../dto/Signup.dto";
 import { SigninDto } from "../../../dto/Signin.dto";
 import { PasswdRemindDto } from "../../../dto/PasswdRemind.dto";
 import { PasswdResetDto } from "../../../dto/PasswdReset.dto";
+import { ApiError, ApiResponse, hashPassword, random, sendEmail } from "../../../helpers";
 
 const prisma = new PrismaClient();
 const { VERIFICATION_TOKEN_TTL, SESSION_TOKEN_TTL, ACCESS_TOKEN_TTL, APP_URL } = process.env;
@@ -137,6 +133,33 @@ export default class AuthController {
   }
 
   // refresh ???
+  @Get("/refresh")
+  async refresh(@Req() req: Request, @Res() res: Response) {
+    try {
+      const cookies = req.cookies;
+      if (!cookies?.sid) return new ApiError(401, { code: "UNAUTHORIZED", message: "Unauthorized" });
+      const sessionToken = cookies.sid;
+      const { id, email } = jwt.verify(sessionToken, SESSION_SECRET) as IJwtPayload;
+      const session = await prisma.session.findFirst({ where: { sessionToken } });
+      if (!session || session.user_id !== id) return new ApiError(403, { code: "FORBIDDEN", message: "Forbidden" });
+      const user = await prisma.user.findFirst({ where: { id: session.user_id } });
+      if (!user) return new ApiError(403, { code: "FORBIDDEN", message: "Forbidden" }); // ??
+      const accessToken = jwt.sign({ id: user.id, role: user.role }, ACCESS_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
+
+      // jwt.verify(sessionToken, SESSION_SECRET,
+      // (err: VerifyErrors | null, decoded: IJwtPayload) => {
+      //  ============================ ?????????????????????
+      //   if (err || user.email !== decoded.email) return new ApiError(403, { code: "FORBIDDEN", message: "Forbidden" });
+      //  ============================ ?????????????????????
+      //   const accessToken = jwt.sign({ id: user.id, role: user.role }, ACCESS_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
+      // });
+
+      return new ApiResponse(true, { email, accessToken });
+    } catch (error) {
+      console.log(error);
+      return new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+    }
+  }
 
   @Post("/signout")
   async signout(@CookieParam("sid") token: string, @Res() res: Response) {
