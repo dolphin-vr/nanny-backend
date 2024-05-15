@@ -46,7 +46,7 @@ model Nanny {
   name           String
   avatar         String?
   birthday       DateTime
-  experiense     Int
+  experience     String
   education      String
   kids_age       String
   price_per_hour Int

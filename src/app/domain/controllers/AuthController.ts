@@ -125,7 +125,7 @@ export default class AuthController {
       // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
       res.cookie("sid", sessionToken, { httpOnly: true, sameSite: "none", secure: true, maxAge: SESSION_MAX_AGE });
 
-      return new ApiResponse(true, { email, accessToken });
+      return new ApiResponse(true, { email, accessToken, username: user.username, avatar: user.avatar, theme: user.theme });
     } catch (error) {
       console.log(error);
       return new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
