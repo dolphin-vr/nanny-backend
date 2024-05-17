@@ -5,7 +5,7 @@ import "dotenv/config";
 
 import { IService } from "types/services";
 import { controllers } from "../app/domain";
-import { middlewares } from "../app/middlewares";
+import { AuthChecker, middlewares } from "../app/middlewares";
 import cookieParser from "cookie-parser";
 
 const PORT = process.env.PORT;
@@ -30,6 +30,7 @@ export class Tcp implements IService {
     server.use(cookieParser());
 
     useExpressServer(server, {
+      authorizationChecker:AuthChecker,
       routePrefix,
       controllers,
       middlewares,

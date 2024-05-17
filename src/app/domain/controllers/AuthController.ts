@@ -45,7 +45,7 @@ export default class AuthController {
       const { username, email, password } = body;
       const user = await prisma.user.findFirst({ where: { email } });
       if (user) {
-        return new ApiError(409, { code: "INVALID_EMAIL", message: "Invalid e-mail" });
+        throw new ApiError(409, { code: "INVALID_EMAIL", message: "Invalid e-mail" });
       }
 
       const verificationToken = jwt.sign({ email }, SESSION_SECRET, { expiresIn: VERIFICATION_TOKEN_TTL });
@@ -62,7 +62,7 @@ export default class AuthController {
       return new ApiResponse(true, { email: newUser.email });
     } catch (error) {
       console.log(error);
-      return new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+      throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
     }
   }
 
@@ -72,11 +72,11 @@ export default class AuthController {
     const { email } = jwt.verify(token, SESSION_SECRET) as IJwtPayload;
     const user = await prisma.user.findFirst({ where: { email } });
     if (!user) {
-      return new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" });
+      throw new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" });
     }
     const verificationToken = await prisma.session.findFirst({ where: { user_id: user.id, sessionToken: token } });
     if (!verificationToken) {
-      return new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" }); // ?? error code and message ?? sth about token?
+      throw new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" }); // ?? error code and message ?? sth about token?
     }
     await prisma.user.update({ where: { email }, data: { verified: true } });
     await prisma.session.delete({ where: { id: verificationToken.id } });
@@ -103,14 +103,14 @@ export default class AuthController {
       const { email, password } = body;
       const user = await prisma.user.findFirst({ where: { email } });
       if (!user) {
-        return new ApiError(401, { code: "INVALID_EMAIL_OR_PASSWORD", message: "E-mail or password invalid" });
+        throw new ApiError(401, { code: "INVALID_EMAIL_OR_PASSWORD", message: "E-mail or password invalid" });
       }
       if (!user.verified) {
-        return new ApiError(418, { code: "EMAIL_NOT_VERIFIED", message: "E-mail is not verified" });
+        throw new ApiError(418, { code: "EMAIL_NOT_VERIFIED", message: "E-mail is not verified" });
       }
       const hashedPassword: string = hashPassword(user.salt, password);
       if (hashedPassword !== user.password) {
-        return new ApiError(401, { code: "INVALID_EMAIL_OR_PASSWORD", message: "E-mail or password invalid" });
+        throw new ApiError(401, { code: "INVALID_EMAIL_OR_PASSWORD", message: "E-mail or password invalid" });
       }
 
       const sessionToken = jwt.sign({ id: user.id, email }, SESSION_SECRET, { expiresIn: SESSION_TOKEN_TTL });
@@ -128,7 +128,7 @@ export default class AuthController {
       return new ApiResponse(true, { email, accessToken, username: user.username, avatar: user.avatar, theme: user.theme });
     } catch (error) {
       console.log(error);
-      return new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+      throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
     }
   }
 
@@ -137,19 +137,19 @@ export default class AuthController {
   async refresh(@Req() req: Request, @Res() res: Response) {
     try {
       const cookies = req.cookies;
-      if (!cookies?.sid) return new ApiError(401, { code: "UNAUTHORIZED", message: "Unauthorized" });
+      if (!cookies?.sid) throw new ApiError(401, { code: "UNAUTHORIZED", message: "Unauthorized" });
       const sessionToken = cookies.sid;
       const { id, email } = jwt.verify(sessionToken, SESSION_SECRET) as IJwtPayload;
       const session = await prisma.session.findFirst({ where: { sessionToken } });
-      if (!session || session.user_id !== id) return new ApiError(403, { code: "FORBIDDEN", message: "Forbidden" });
+      if (!session || session.user_id !== id) throw new ApiError(403, { code: "FORBIDDEN", message: "Forbidden" });
       const user = await prisma.user.findFirst({ where: { id: session.user_id } });
-      if (!user) return new ApiError(403, { code: "FORBIDDEN", message: "Forbidden" }); // ??
+      if (!user) throw new ApiError(403, { code: "FORBIDDEN", message: "Forbidden" }); // ??
       const accessToken = jwt.sign({ id: user.id, role: user.role }, ACCESS_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
 
       // jwt.verify(sessionToken, SESSION_SECRET,
       // (err: VerifyErrors | null, decoded: IJwtPayload) => {
       //  ============================ ?????????????????????
-      //   if (err || user.email !== decoded.email) return new ApiError(403, { code: "FORBIDDEN", message: "Forbidden" });
+      //   if (err || user.email !== decoded.email) throw new ApiError(403, { code: "FORBIDDEN", message: "Forbidden" });
       //  ============================ ?????????????????????
       //   const accessToken = jwt.sign({ id: user.id, role: user.role }, ACCESS_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
       // });
@@ -157,14 +157,14 @@ export default class AuthController {
       return new ApiResponse(true, { email, accessToken });
     } catch (error) {
       console.log(error);
-      return new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+      throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
     }
   }
 
   @Post("/signout")
   async signout(@CookieParam("sid") token: string, @Res() res: Response) {
     console.log("sid= ", token);
-    if (!token) return new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+    if (!token) throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
 
     const { id } = jwt.verify(token, SESSION_SECRET) as IJwtPayload;
     const session = await prisma.session.findFirst({ where: { user_id: id, sessionToken: token } });
@@ -199,7 +199,7 @@ export default class AuthController {
       const { email } = body;
       const user = await prisma.user.findFirst({ where: { email } });
       if (!user) {
-        return new ApiError(401, { code: "INVALID_EMAIL", message: "Invalid e-mail" });
+        throw new ApiError(401, { code: "INVALID_EMAIL", message: "Invalid e-mail" });
       }
       const payload = { email: user.email };
       const verificationToken = jwt.sign(payload, SESSION_SECRET, { expiresIn: VERIFICATION_TOKEN_TTL });
@@ -213,7 +213,7 @@ export default class AuthController {
       return new ApiResponse(true, { email });
     } catch (error) {
       console.log(error);
-      return new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+      throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
     }
   }
 
@@ -238,14 +238,14 @@ export default class AuthController {
       const { email } = jwt.verify(token, SESSION_SECRET) as IJwtPayload;
       const user = await prisma.user.findFirst({ where: { email } });
       if (!user) {
-        return new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" });
+        throw new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" });
       }
       await prisma.user.update({ where: { id: user.id }, data: { password: hashPassword(user.salt, password) } });
       await prisma.session.deleteMany({ where: { user_id: user.id } }); // delete all active sessions
       return new ApiResponse(true, "Password was changed successfuly");
     } catch (error) {
       console.log(error);
-      return new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+      throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
     }
   }
 }

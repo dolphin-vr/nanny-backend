@@ -6,7 +6,6 @@ const prisma = new PrismaClient();
 
 @Controller("/users")
 export default class UsersController {
-
   // FOR DEV ONLY!!! REMOVE IN PRODUCTION!!!!!
   @Delete("/delete")
   async deleteUsers() {
@@ -15,8 +14,7 @@ export default class UsersController {
       return new ApiResponse(true, "Successful deleted");
     } catch (error) {
       console.log(error);
-      return new ApiError(400, { code: "BAD_REQ", message: "Deletion error" });
+      throw new ApiError(400, { code: "BAD_REQ", message: "Deletion error" });
     }
   }
-
 }
