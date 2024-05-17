@@ -15,7 +15,7 @@ const findUserByEmail = async (email: string): Promise<User | null> => {
   return await prisma.user.findFirst({ where: { email } });
 };
 
-const findUserById = async (id: number): Promise<User | null> => {
+const findUserById = async (id: number|undefined): Promise<User | null> => {
   return await prisma.user.findFirst({ where: { id } });
 };
 
