@@ -65,6 +65,7 @@ model Favorite {
   nanny_id Int
   user     User  @relation(fields: [user_id], references: [id])
   nanny    Nanny @relation(fields: [nanny_id], references: [id])
+  @@unique([user_id, nanny_id])
 }
 
 model Review {

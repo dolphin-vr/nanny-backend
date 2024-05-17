@@ -1,6 +1,6 @@
 import "reflect-metadata";
 import { JsonController, Post, Body, Param, UseBefore, Req, Patch, CookieParam, Res, Get, BadRequestError, HttpError } from "routing-controllers";
-import { validate } from "class-validator";
+// import { validate } from "class-validator";
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
 import jwt, { VerifyErrors } from "jsonwebtoken";
@@ -10,6 +10,7 @@ import { SigninDto } from "../../../dto/Signin.dto";
 import { PasswdRemindDto } from "../../../dto/PasswdRemind.dto";
 import { PasswdResetDto } from "../../../dto/PasswdReset.dto";
 import { ApiError, ApiResponse, hashPassword, isApiError, random, sendEmail } from "../../../helpers";
+import dbServises from '../../../services/dbApi'
 
 const prisma = new PrismaClient();
 const { VERIFICATION_TOKEN_TTL, SESSION_TOKEN_TTL, ACCESS_TOKEN_TTL, APP_URL } = process.env;
@@ -32,27 +33,17 @@ export default class AuthController {
    */
   @Post("/signup")
   async signup(@Body() body: SignupDto) {
-    // const errors = await validate(body);
-    // if (errors.length) {
-    //   throw new ApiError(400, {
-    //     message: "Validation failed",
-    //     code: "SIGNUP_VALIDATION_ERROR",
-    //     errors,
-    //   });
-    // }
 
     try {
       const { username, email, password } = body;
-      const user = await prisma.user.findFirst({ where: { email } });
+      const user =await dbServises.findUserByEmail(email);
       if (user) {
-        console.log('HttpError(409, "Invalid e-mail")');
-        throw new ApiError(409, { code: "INVALID_EMAIL", message: "Invalid e-mail" }); // HttpError(409, "Invalid e-mail"); //
+        throw new ApiError(409, { code: "INVALID_EMAIL", message: "Invalid e-mail" });
       }
 
       const verificationToken = jwt.sign({ email }, SESSION_SECRET, { expiresIn: VERIFICATION_TOKEN_TTL });
-      const salt = random();
-      const newUser = await prisma.user.create({ data: { username, email, password: hashPassword(salt, password), salt } });
-      await prisma.session.create({ data: { user_id: newUser.id, sessionToken: verificationToken } });
+      const newUser = await dbServises.createUser(body);
+      await dbServises.createSession(newUser.id, verificationToken);
 
       const verificationEmail = {
         to: email,
@@ -170,8 +161,12 @@ export default class AuthController {
 
       return new ApiResponse(true, { email, accessToken });
     } catch (error) {
-      console.log(error);
-      throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+      if (error instanceof ApiError) {
+        throw new ApiError(error.status, { code: error.code, message: error.message });
+      } else {
+        throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+        // throw new ApiError(500, { code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred" });
+      }
     }
   }
 
@@ -226,8 +221,12 @@ export default class AuthController {
       await sendEmail(resetpasswdEmail);
       return new ApiResponse(true, { email });
     } catch (error) {
-      console.log(error);
-      throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+      if (error instanceof ApiError) {
+        throw new ApiError(error.status, { code: error.code, message: error.message });
+      } else {
+        throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+        // throw new ApiError(500, { code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred" });
+      }
     }
   }
 
@@ -258,8 +257,12 @@ export default class AuthController {
       await prisma.session.deleteMany({ where: { user_id: user.id } }); // delete all active sessions
       return new ApiResponse(true, "Password was changed successfuly");
     } catch (error) {
-      console.log(error);
-      throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+      if (error instanceof ApiError) {
+        throw new ApiError(error.status, { code: error.code, message: error.message });
+      } else {
+        throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+        // throw new ApiError(500, { code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred" });
+      }
     }
   }
 }
