@@ -1,7 +1,7 @@
 import { IsEmail } from "class-validator";
-import type { IPasswdRemind } from "types/Auth.types";
+// import type { IPasswdRemind } from "types/Auth.types";
 
-export class PasswdRemindDto implements IPasswdRemind {
-  @IsEmail()
-  email: string = "";
+export class PasswdRemindDto {
+  @IsEmail({}, { message: "Provided Email is not valid" })
+  public email: string = "";
 }
