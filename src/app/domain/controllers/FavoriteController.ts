@@ -1,19 +1,26 @@
 import { PrismaClient } from "@prisma/client";
-import { Get, HeaderParam, JsonController, QueryParam, QueryParams } from "routing-controllers";
+import { Authorized, BadRequestError, Get, JsonController, } from "routing-controllers";
 import { ApiError, ApiResponse } from "../../../helpers";
+import { Authentication } from "app/middlewares/Authentication";
+// import { Authorization } from "app/middlewares/AuthChecker";
+import { ACCESS_LIST } from "config/accessList";
 
 const prisma = new PrismaClient();
 
-@JsonController("/nanny")
+@JsonController("/favorites")
+@Authorized(ACCESS_LIST.all)
 export default class FavoriteController {
   @Get()
-  async getAllNannies(@HeaderParam("authorization") token: string, @QueryParams() page: number, limit: number) {
+  async getAllFavorites() {
     try {
-      const nannies = prisma.nanny.findMany({ skip: (page - 1) * limit, take: limit });
-      const total = prisma.nanny.count();
+      console.log("ctrl 1");
+      const nannies = prisma.nanny.findMany({ take: 10 });
+      const total = await prisma.nanny.count();
       return new ApiResponse(true, { total, nannies });
+      // return new ApiResponse(true, { nannies });
     } catch (error) {
-      return new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+      console.log("ctrl error 1");
+      throw new BadRequestError("OOPS!") // ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
     }
   }
 }
