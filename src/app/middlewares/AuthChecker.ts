@@ -60,7 +60,29 @@ export const AuthChecker = async (action: Action, roles: String[]) => {
     return jwtVerifyPromise;
     // ===
   } catch (error) {
-    // console.log("error 4");
-    throw new UnauthorizedError("oops") // ApiError(401, { code: "USER_NOT_AUTHORIZED", message: "User not authorized" });
+    console.log("error 4");
+    console.log("catch error= ", error);
+    if (error instanceof ApiError) {
+      console.log("instanceof= true");
+      throw new ApiError(error.status, { code: error.code, message: error.message });
+    } else {
+      console.log("instanceof= false");
+      throw new ApiError(500, { code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred" });
+    }
+
+    // if (error instanceof ApiError) {
+    //   throw new ApiError(error.error.status, { code: error.error.code, message: error.error.message });
+    // } else if (isApiError(error)) {
+    //   throw new ApiError(error.error.status, { code: error.error.code, message: error.error.message });
+    // } else {
+    //   throw new ApiError(500, { code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred" });
+    // }
+
+    // if (typeof error === Object){}
+    // const httpCode = error.hasOwnProperty('httpCode')  ? error.httpCode: 400;
+    // throw new HttpError(418, "signup oops"); // ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+    // throw new HttpError(error);
+
+    // throw new UnauthorizedError("oops") // ApiError(401, { code: "USER_NOT_AUTHORIZED", message: "User not authorized" });
   }
 };

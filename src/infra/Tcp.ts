@@ -36,7 +36,7 @@ export class Tcp implements IService {
       middlewares,
       cors: true,
       defaultErrorHandler: true,
-      validation: false,
+      validation: true,
     });
 
     return new Promise<boolean>(resolve => {

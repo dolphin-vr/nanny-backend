@@ -1,10 +1,11 @@
-import { Length, IsEmail } from "class-validator";
-import type { ISignin } from "types/Auth.types";
+import { Length, IsEmail, IsString } from "class-validator";
+// import type { ISignin } from "types/Auth.types";
 
-export class SigninDto implements ISignin {
-  @IsEmail()
-  email: string = "";
+export class SigninDto {
+  @IsEmail({}, { message: "Provided Email is not valid" })
+  public email: string = "";
 
-  @Length(7, 48)
-  password: string = "";
+  @IsString()
+  @Length(7, 48, { message: "Password should be from 7 to 48 characters" })
+  public password: string = "";
 }

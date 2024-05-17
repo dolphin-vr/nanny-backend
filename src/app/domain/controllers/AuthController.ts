@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { JsonController, Post, Body, Param, UseBefore, Req, Patch, CookieParam, Res, Get } from "routing-controllers";
+import { JsonController, Post, Body, Param, UseBefore, Req, Patch, CookieParam, Res, Get, BadRequestError, HttpError } from "routing-controllers";
 import { validate } from "class-validator";
 import { Request, Response } from "express";
 import { PrismaClient } from "@prisma/client";
@@ -9,7 +9,7 @@ import { SignupDto } from "../../../dto/Signup.dto";
 import { SigninDto } from "../../../dto/Signin.dto";
 import { PasswdRemindDto } from "../../../dto/PasswdRemind.dto";
 import { PasswdResetDto } from "../../../dto/PasswdReset.dto";
-import { ApiError, ApiResponse, hashPassword, random, sendEmail } from "../../../helpers";
+import { ApiError, ApiResponse, hashPassword, isApiError, random, sendEmail } from "../../../helpers";
 
 const prisma = new PrismaClient();
 const { VERIFICATION_TOKEN_TTL, SESSION_TOKEN_TTL, ACCESS_TOKEN_TTL, APP_URL } = process.env;
@@ -32,20 +32,21 @@ export default class AuthController {
    */
   @Post("/signup")
   async signup(@Body() body: SignupDto) {
-    const errors = await validate(body);
-    if (errors.length > 0) {
-      throw new ApiError(400, {
-        message: "Validation failed",
-        code: "SIGNUP_VALIDATION_ERROR",
-        errors,
-      });
-    }
+    // const errors = await validate(body);
+    // if (errors.length) {
+    //   throw new ApiError(400, {
+    //     message: "Validation failed",
+    //     code: "SIGNUP_VALIDATION_ERROR",
+    //     errors,
+    //   });
+    // }
 
     try {
       const { username, email, password } = body;
       const user = await prisma.user.findFirst({ where: { email } });
       if (user) {
-        throw new ApiError(409, { code: "INVALID_EMAIL", message: "Invalid e-mail" });
+        console.log('HttpError(409, "Invalid e-mail")');
+        throw new ApiError(409, { code: "INVALID_EMAIL", message: "Invalid e-mail" }); // HttpError(409, "Invalid e-mail"); //
       }
 
       const verificationToken = jwt.sign({ email }, SESSION_SECRET, { expiresIn: VERIFICATION_TOKEN_TTL });
@@ -61,26 +62,36 @@ export default class AuthController {
       await sendEmail(verificationEmail);
       return new ApiResponse(true, { email: newUser.email });
     } catch (error) {
-      console.log(error);
-      throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+      if (error instanceof ApiError) {
+        throw new ApiError(error.status, { code: error.code, message: error.message });
+      } else {
+        throw new ApiError(500, { code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred" });
+      }
     }
   }
 
   @Post("/verify/:token")
   async verify(@Param("token") token: string) {
-    // TRY-CATCH ???
-    const { email } = jwt.verify(token, SESSION_SECRET) as IJwtPayload;
-    const user = await prisma.user.findFirst({ where: { email } });
-    if (!user) {
-      throw new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" });
+    try {
+      const { email } = jwt.verify(token, SESSION_SECRET) as IJwtPayload;
+      const user = await prisma.user.findFirst({ where: { email } });
+      if (!user) {
+        throw new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" });
+      }
+      const verificationToken = await prisma.session.findFirst({ where: { user_id: user.id, sessionToken: token } });
+      if (!verificationToken) {
+        throw new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" }); // ?? error code and message ?? sth about token?
+      }
+      await prisma.user.update({ where: { email }, data: { verified: true } });
+      await prisma.session.delete({ where: { id: verificationToken.id } });
+      return new ApiResponse(true, "Verification successful");
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw new ApiError(error.status, { code: error.code, message: error.message });
+      } else {
+        throw new ApiError(500, { code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred" });
+      }
     }
-    const verificationToken = await prisma.session.findFirst({ where: { user_id: user.id, sessionToken: token } });
-    if (!verificationToken) {
-      throw new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" }); // ?? error code and message ?? sth about token?
-    }
-    await prisma.user.update({ where: { email }, data: { verified: true } });
-    await prisma.session.delete({ where: { id: verificationToken.id } });
-    return new ApiResponse(true, "Verification successful");
   }
 
   /**
@@ -90,14 +101,14 @@ export default class AuthController {
    */
   @Post("/signin")
   async signin(@Body() body: SigninDto, @Res() res: Response) {
-    const errors = await validate(body);
-    if (errors.length > 0) {
-      throw new ApiError(400, {
-        message: "Validation failed",
-        code: "SIGNIN_VALIDATION_ERROR",
-        errors,
-      });
-    }
+    // const errors = await validate(body);
+    // if (errors.length > 0) {
+    //   throw new ApiError(400, {
+    //     message: "Validation failed",
+    //     code: "SIGNIN_VALIDATION_ERROR",
+    //     errors,
+    //   });
+    // }
 
     try {
       const { email, password } = body;
@@ -127,12 +138,15 @@ export default class AuthController {
 
       return new ApiResponse(true, { email, accessToken, username: user.username, avatar: user.avatar, theme: user.theme });
     } catch (error) {
-      console.log(error);
-      throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+      if (error instanceof ApiError) {
+        throw new ApiError(error.status, { code: error.code, message: error.message });
+      } else {
+        throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+        // throw new ApiError(500, { code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred" });
+      }
     }
   }
 
-  // refresh ???
   @Get("/refresh")
   async refresh(@Req() req: Request, @Res() res: Response) {
     try {
@@ -186,14 +200,14 @@ export default class AuthController {
    */
   @Post("/remind")
   async remind(@Body() body: PasswdRemindDto) {
-    const errors = await validate(body);
-    if (errors.length > 0) {
-      throw new ApiError(400, {
-        message: "Validation failed",
-        code: "REMIND_VALIDATION_ERROR",
-        errors,
-      });
-    }
+    // const errors = await validate(body);
+    // if (errors.length > 0) {
+    //   throw new ApiError(400, {
+    //     message: "Validation failed",
+    //     code: "REMIND_VALIDATION_ERROR",
+    //     errors,
+    //   });
+    // }
 
     try {
       const { email } = body;
@@ -224,14 +238,14 @@ export default class AuthController {
    */
   @Patch("/reset")
   async reset(@Body() body: PasswdResetDto) {
-    const errors = await validate(body);
-    if (errors.length > 0) {
-      throw new ApiError(400, {
-        message: "Validation failed",
-        code: "RESET_VALIDATION_ERROR",
-        errors,
-      });
-    }
+    // const errors = await validate(body);
+    // if (errors.length > 0) {
+    //   throw new ApiError(400, {
+    //     message: "Validation failed",
+    //     code: "RESET_VALIDATION_ERROR",
+    //     errors,
+    //   });
+    // }
 
     try {
       const { password, token } = body;

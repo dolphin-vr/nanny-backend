@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import { PrismaClient } from "@prisma/client";
 import { Authorized, BadRequestError, Get, JsonController, QueryParams } from "routing-controllers";
 import { ApiError, ApiResponse } from "../../../helpers";

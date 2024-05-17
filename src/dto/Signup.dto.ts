@@ -7,10 +7,10 @@ export class SignupDto {
   public username: string = "";
 
   @IsEmail({}, { message: "Provided Email is not valid" })
-  email: string = "";
+  public email: string = "";
 
   @IsString()
   @Length(7, 48, { message: "Password should be from 7 to 48 characters" })
-  password: string = "";
+  public password: string = "";
 }
 //  implements ISignup
