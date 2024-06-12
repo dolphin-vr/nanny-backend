@@ -1,5 +1,5 @@
 export const ACCESS_LIST = {
-  all: ["USER", "NANNY", "MANAGER", "ADMIN"],
+  allusers: ["USER", "NANNY", "MANAGER", "ADMIN"],
   managers: ["MANAGER", "ADMIN"],
   admins: [ "ADMIN"],
 };
