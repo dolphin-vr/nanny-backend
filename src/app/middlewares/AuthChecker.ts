@@ -4,6 +4,7 @@ import { Action, ExpressMiddlewareInterface, UnauthorizedError } from "routing-c
 import jwt, { Jwt, JwtPayload, VerifyErrors } from "jsonwebtoken";
 import { IJwtPayload, IRequest } from "types/extended";
 import { ApiError } from "../../helpers";
+import { DBService,  } from "../../services";
 
 const prisma = new PrismaClient();
 const ACCESS_SECRET: string = process.env.ACCESS_SECRET as string;
@@ -44,7 +45,7 @@ export const AuthChecker = async (action: Action, roles: String[]) => {
       }
 
       const { id } = decoded.payload as IJwtPayload;
-      const user = await prisma.user.findFirst({ where: { id } });
+      const user = await DBService.findUserById(id);
       if (!user) {
         // console.log("error 3");
         throw new ApiError(403, { code: "FORBIDDEN", message: "Forbidden" });
@@ -64,7 +65,7 @@ export const AuthChecker = async (action: Action, roles: String[]) => {
     console.log("catch error= ", error);
     if (error instanceof ApiError) {
       console.log("instanceof= true");
-      throw new ApiError(error.status, { code: error.code, message: error.message });
+      throw new ApiError(error.error.status, {  message: error.message }); // code: error.code,
     } else {
       console.log("instanceof= false");
       throw new ApiError(500, { code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred" });

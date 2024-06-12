@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer";
 import { Options } from "nodemailer/lib/smtp-connection";
-import { IEmail } from "types/IEmail";
+import { Email } from "types/IEmail";
 
 const { MAIL_HOST, MAIL_PORT = "587", MAIL_USER, MAIL_PASSWD, MAIL_FROM } = process.env;
 
@@ -20,7 +20,7 @@ const nodemailerConfig: Options = {
 };
 const transport = nodemailer.createTransport(nodemailerConfig);
 
-export const sendEmail = (data: IEmail) => {
+export const sendEmail = (data: Email) => {
   // console.log("opt-mail= ", nodemailerConfig);
   const email = { ...data, from: MAIL_FROM };
   return transport.sendMail(email);
