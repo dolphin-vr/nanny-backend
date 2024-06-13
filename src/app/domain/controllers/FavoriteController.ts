@@ -32,14 +32,14 @@ export default class FavoriteController {
     }
   }
 
-  @Delete("/:nanny")
-  async deleteFavorite(@CurrentUser({ required: true }) user: User, @Param("nanny") nanny: number) {
-    try {
-      // console.log("ctrl 1");
-      const favorite = await dbServises.deleteFromFavorites(user.id, nanny);
-      return new ApiResponse(true, { favorite });
-    } catch (error) {
-      throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
-    }
-  }
+  // @Delete("/:nanny")
+  // async deleteFavorite(@CurrentUser({ required: true }) user: User, @Param("nanny") nanny: number) {
+  //   try {
+  //     // console.log("ctrl 1");
+  //     const favorite = await dbServises.deleteFromFavorites(user.id, nanny);
+  //     return new ApiResponse(true, { favorite });
+  //   } catch (error) {
+  //     throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+  //   }
+  // }
 }
