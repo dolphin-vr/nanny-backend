@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { User } from "@prisma/client";
 import { SignupDto } from "../dto/Signup.dto";
 import { hashPassword, random } from "../helpers";
@@ -42,7 +42,14 @@ class DBService {
   }
 
   async deleteSessionByToken(sessionToken: string) {
-    return await prisma.session.delete({ where: { sessionToken } });
+    // return await prisma.session.delete({ where: { sessionToken } });
+    try {
+      await prisma.session.delete({ where: { sessionToken } });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+        console.log("sessionToken not found");
+      } else console.error(error);
+    }
   }
 
   async deleteAllSessions(user_id: number) {
@@ -65,11 +72,11 @@ class DBService {
     return await prisma.favorite.create({ data: { user_id, nanny_id } });
   }
 
-  async deleteFromFavorites(user_id: number, nanny_id: number) {
-    const favoriteId = { user_id, nanny_id };
-    return await prisma.favorite.delete({ where: { favoriteId } });
-    // return await prisma.favorite.delete({ where: { favoriteId: { user_id, nanny_id } } });
-  }
+  // async deleteFromFavorites(user_id: number, nanny_id: number) {
+  //   const favoriteId = { user_id, nanny_id };
+  //   return await prisma.favorite.delete({ where: { favoriteId } });
+  //   // return await prisma.favorite.delete({ where: { favoriteId: { user_id, nanny_id } } });
+  // }
 }
 
 // const session = await prisma.session.findFirst({ where: { sessionToken } });
