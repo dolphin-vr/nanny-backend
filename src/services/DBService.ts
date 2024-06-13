@@ -66,7 +66,9 @@ class DBService {
   }
 
   async deleteFromFavorites(user_id: number, nanny_id: number) {
-    return await prisma.favorite.delete({ where: { favoriteId: { user_id, nanny_id } } });
+    const favoriteId = { user_id, nanny_id };
+    return await prisma.favorite.delete({ where: { favoriteId } });
+    // return await prisma.favorite.delete({ where: { favoriteId: { user_id, nanny_id } } });
   }
 }
 
