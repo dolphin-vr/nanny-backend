@@ -6,7 +6,7 @@ const SESSION_SECRET: string = process.env.SESSION_SECRET as string;
 interface TokenCheckResult {
   valid: boolean;
   expired: boolean;
-  email: string | undefined;
+  email: string;
 }
 
 export const checkToken = (token: string): TokenCheckResult => {
@@ -17,10 +17,10 @@ export const checkToken = (token: string): TokenCheckResult => {
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
       console.log("Токен прострочений");
-      return { valid: false, expired: true, email: undefined };
+      return { valid: false, expired: true, email: "" };
     }
     console.log("Токен недійсний");
-    return { valid: false, expired: false, email: undefined };
+    return { valid: false, expired: false, email: "" };
   }
 };
 
