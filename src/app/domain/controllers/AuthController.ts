@@ -161,14 +161,6 @@ export default class AuthController {
    */
   @Patch("/reset")
   async reset(@Body() body: PasswdResetDto) {
-    // const errors = await validate(body);
-    // if (errors.length > 0) {
-    //   throw new ApiError(400, {
-    //     message: "Validation failed",
-    //     code: "RESET_VALIDATION_ERROR",
-    //     errors,
-    //   });
-    // }
 
     try {
       const { password, token } = body;

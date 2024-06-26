@@ -122,6 +122,25 @@ class AuthService {
       };
     }
   };
+
+  async resetPasswd(password: string, token: string) {
+    try {
+      const checkedToken=checkToken(token);
+      if (!checkedToken.expired || !checkedToken.valid){
+        await DBService.deleteSessionByToken(token);
+        throw new HttpError(401, "INVALID_TOKEN");
+      }
+      const user = await DBService.findUserByEmail(checkedToken.email);
+      if (!user) throw new BadRequestError("BAD_REQUEST!");
+
+    } catch (error) {
+      if (error instanceof HttpError) {
+        throw new HttpError(error.httpCode, error.message );
+      } else {
+        throw new HttpError(500, "INTERNAL_SERVER_ERROR");
+      };
+    }
+  };
 }
 
 export default new AuthService();
