@@ -1,7 +1,7 @@
 import "reflect-metadata";
 import { PrismaClient } from "@prisma/client";
 import { User } from "@prisma/client";
-import { Authorized, CurrentUser, Delete, Get, JsonController, Param, Post } from "routing-controllers";
+import { Authorized, BadRequestError, CurrentUser, Delete, Get, JsonController, Param, Post } from "routing-controllers";
 import { ApiError, ApiResponse } from "../../../helpers";
 import { ACCESS_LIST } from "../../../config/accessList";
 import dbServises from "../../../services/DBService";
@@ -17,7 +17,7 @@ export default class FavoriteController {
       const favorites = await dbServises.getFavorites(user.id);
       return new ApiResponse(true, { favorites });
     } catch (error) {
-      throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+      throw new BadRequestError("BAD_REQUEST!");
     }
   }
 
@@ -28,7 +28,7 @@ export default class FavoriteController {
       const favorite = await dbServises.addToFavorites(user.id, nanny);
       return new ApiResponse(true, { favorite });
     } catch (error) {
-      throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
+      throw new BadRequestError("BAD_REQUEST!");
     }
   }
 

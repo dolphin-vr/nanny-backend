@@ -37,6 +37,22 @@ class mailService {
     // const email = { ...data, from: MAIL_FROM };
     return await this.transport.sendMail(verificationEmail);
   }
+
+  async sendResetURL(email: string, verificationToken: string) {
+    const verificationEmail = {
+      from: MAIL_FROM,
+      to: email,
+      subject: "NannyService Password reset",
+      html: `
+				<div>
+					<h1>T</h1>
+					<p>Click URL below to reset your password</p>
+					<a href="${APP_URL}/reset/${verificationToken}" target="_blank">${APP_URL}/verify/${verificationToken}</a>
+				</div>`,
+    };
+    // const email = { ...data, from: MAIL_FROM };
+    return await this.transport.sendMail(verificationEmail);
+  }
 }
 
 export default new mailService();

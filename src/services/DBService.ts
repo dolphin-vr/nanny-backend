@@ -56,8 +56,8 @@ class DBService {
     return await prisma.session.deleteMany({ where: { user_id } });
   }
 
-  async getNanniesPage(page: number, limit: number) {
-    return await prisma.nanny.findMany({ skip: (page - 1) * limit, take: limit });
+  async getNanniesPage(skip: number, take: number) {
+    return await prisma.nanny.findMany({ skip, take });
   }
 
   async getNanniesCount() {

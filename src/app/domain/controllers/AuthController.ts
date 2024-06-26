@@ -44,36 +44,18 @@ export default class AuthController {
     }
   }
 
+  @HttpCode(200)
   @Post("/verify/:token")
   async verify(@Param("token") token: string) {
     try {
-      const checkedToken = checkToken(token);
-      if (checkedToken.expired || !checkedToken.valid) return new ApiResponse(false, "Token expired or invalid");
-      const email = checkedToken.email as string;
-      const user = DBService.findUserByEmail(email);
-      if (!user) throw new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" });
+      await AuthService.verifyEmail(token);
 
-      // const { email } = jwt.verify(token, SESSION_SECRET) as IJwtPayload;
-      // if (!email) {
-      //   throw new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" });
-      // }
-      // const user = await DBService.findUserByEmail(email);
-      // if (!user) {
-      //   throw new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" });
-      // }
-      // const verificationToken = await DBService.findSession(user.id, token)
-      // if (!verificationToken) {
-      //   throw new ApiError(404, { code: "USER_NOT_FOUND", message: "User not found" }); // ?? error code and message ?? sth about token?
-      // }
-
-      await DBService.verifyEmail(email);
-      await DBService.deleteSessionByToken(token);
       return new ApiResponse(true, "Verification successful");
     } catch (error) {
-      if (error instanceof ApiError) {
-        throw new ApiError(error.error.status, { code: error.error.code, message: error.message }); // code: error.code,
+      if (error instanceof HttpError) {
+        throw new HttpError(error.httpCode, error.message);
       } else {
-        throw new ApiError(500, { code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred" });
+        throw new HttpError(500, "INTERNAL_SERVER_ERROR");
       }
     }
   }
@@ -87,34 +69,15 @@ export default class AuthController {
   async signin(@Body() body: SigninDto, @Res() res: Response) {
     try {
       const { email, password } = body;
-      const user = await DBService.findUserByEmail(email);
-      if (!user) {
-        throw new ApiError(401, { code: "INVALID_EMAIL_OR_PASSWORD", message: "E-mail or password invalid" });
-      }
-      if (!user.verified) {
-        throw new ApiError(418, { code: "EMAIL_NOT_VERIFIED", message: "E-mail is not verified" });
-      }
-      const hashedPassword: string = hashPassword(user.salt, password);
-      if (hashedPassword !== user.password) {
-        throw new ApiError(401, { code: "INVALID_EMAIL_OR_PASSWORD", message: "E-mail or password invalid" });
-      }
+      const signedUser=await AuthService.loginUser(email,password);
+      return new ApiResponse(true, signedUser);
 
-      const sessionToken = jwt.sign({ email }, SESSION_SECRET, { expiresIn: SESSION_TOKEN_TTL });
-      const accessToken = jwt.sign({ email, role: user.role }, ACCESS_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
-
-      await DBService.createSession(user.id, sessionToken);
-
-      res.cookie("sid", sessionToken, { httpOnly: true, sameSite: "none", secure: true, maxAge: SESSION_MAX_AGE });
-
-      return new ApiResponse(true, { email, accessToken, username: user.username, avatar: user.avatar, theme: user.theme });
     } catch (error) {
-      if (error instanceof ApiError) {
-        throw new ApiError(error.error.status, { code: error.error.code, message: error.error.message });
-        // throw new ApiError(error.status, { message: error.message }); // code: error.code,
+      if (error instanceof HttpError) {
+        throw new HttpError(error.httpCode, error.message );
       } else {
-        throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
-        // throw new ApiError(500, { code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred" });
-      }
+        throw new HttpError(500, "INTERNAL_SERVER_ERROR");
+      };
     }
   }
 
@@ -122,14 +85,17 @@ export default class AuthController {
   async refresh(@Req() req: Request, @Res() res: Response) {
     try {
       const cookies = req.cookies;
-      if (!cookies?.sid) throw new ApiError(401, { code: "UNAUTHORIZED", message: "Unauthorized" });
+      if (!cookies?.sid) throw new HttpError(401, "UNAUTHORIZED");
+
       const sessionToken = cookies.sid;
-      const { email } = jwt.verify(sessionToken, SESSION_SECRET) as IJwtPayload;
-      const session = await prisma.session.findFirst({ where: { sessionToken } });
-      if (!session) throw new ApiError(403, { code: "FORBIDDEN", message: "Forbidden" }); //|| session.user_id !== id
-      const user = await prisma.user.findFirst({ where: { id: session.user_id } });
-      if (!user) throw new ApiError(403, { code: "FORBIDDEN", message: "Forbidden" }); // ??
-      const accessToken = jwt.sign({ email, role: user.role }, ACCESS_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
+      const accessToken = AuthService.refreshAccess(sessionToken);
+
+      // const { email } = jwt.verify(sessionToken, SESSION_SECRET) as IJwtPayload;
+      // const session = await prisma.session.findFirst({ where: { sessionToken } });
+      // if (!session) throw new ApiError(403, { code: "FORBIDDEN", message: "Forbidden" }); //|| session.user_id !== id
+      // const user = await prisma.user.findFirst({ where: { id: session.user_id } });
+      // if (!user) throw new ApiError(403, { code: "FORBIDDEN", message: "Forbidden" }); // ??
+      // const accessToken = jwt.sign({ email, role: user.role }, ACCESS_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
 
       // jwt.verify(sessionToken, SESSION_SECRET,
       // (err: VerifyErrors | null, decoded: IJwtPayload) => {
@@ -139,15 +105,13 @@ export default class AuthController {
       //   const accessToken = jwt.sign({email, role: user.role }, ACCESS_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
       // });
 
-      return new ApiResponse(true, { email, accessToken });
+      return new ApiResponse(true, { accessToken });
     } catch (error) {
-      if (error instanceof ApiError) {
-        throw new ApiError(error.error.status, { code: error.error.code, message: error.error.message });
-        // throw new ApiError(error.status, { message: error.message }); // code: error.code,
+      if (error instanceof HttpError) {
+        throw new HttpError(error.httpCode, error.message );
       } else {
-        throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
-        // throw new ApiError(500, { code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred" });
-      }
+        throw new HttpError(500, "INTERNAL_SERVER_ERROR");
+      };
     }
   }
 
@@ -176,38 +140,16 @@ export default class AuthController {
    */
   @Post("/remind")
   async remind(@Body() body: PasswdRemindDto) {
-    // const errors = await validate(body);
-    // if (errors.length > 0) {
-    //   throw new ApiError(400, {
-    //     message: "Validation failed",
-    //     code: "REMIND_VALIDATION_ERROR",
-    //     errors,
-    //   });
-    // }
 
     try {
       const { email } = body;
-      const user = await prisma.user.findFirst({ where: { email } });
-      if (!user) {
-        throw new ApiError(401, { code: "INVALID_EMAIL", message: "Invalid e-mail" });
-      }
-      const payload = { email: user.email };
-      const verificationToken = jwt.sign(payload, SESSION_SECRET, { expiresIn: VERIFICATION_TOKEN_TTL });
-      await prisma.session.create({ data: { user_id: user.id, sessionToken: verificationToken } });
-      const resetpasswdEmail = {
-        to: email,
-        subject: "NannyService Password reset",
-        html: `<p><a href="${APP_URL}/reset/${verificationToken}" target="_blank">Click to reset your password</a></p>`,
-      };
-      await sendEmail(resetpasswdEmail);
+      await AuthService.sendRemind(email);
       return new ApiResponse(true, { email });
     } catch (error) {
-      if (error instanceof ApiError) {
-        throw new ApiError(error.error.status, { code: error.error.code, message: error.error.message });
-        // throw new ApiError(error.status, {  message: error.message }); // code: error.code,
+      if (error instanceof HttpError) {
+        throw new HttpError(error.httpCode, error.message);
       } else {
-        throw new ApiError(400, { code: "BAD_REQUEST", message: "Bad Request" });
-        // throw new ApiError(500, { code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred" });
+        throw new HttpError(500, "INTERNAL_SERVER_ERROR");
       }
     }
   }
@@ -219,14 +161,6 @@ export default class AuthController {
    */
   @Patch("/reset")
   async reset(@Body() body: PasswdResetDto) {
-    // const errors = await validate(body);
-    // if (errors.length > 0) {
-    //   throw new ApiError(400, {
-    //     message: "Validation failed",
-    //     code: "RESET_VALIDATION_ERROR",
-    //     errors,
-    //   });
-    // }
 
     try {
       const { password, token } = body;
